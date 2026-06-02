@@ -1,0 +1,109 @@
+// Работа со шрифтом: загрузка Noto Sans Thai Looped и извлечение геометрии глифа.
+// Геометрия возвращается в нормализованных координатах [0..1] (независимо от размера канвы):
+//   - commands: команды контура, перенесённые в нормализованное пространство (для заливки Path2D);
+//   - contours: набор полилиний (плоские точки [x,y]) — для анимации и подсказки точности.
+// opentype — глобальный объект из lib/opentype.min.js (подключается обычным <script>).
+
+const FONT_URL = "fonts/NotoSansThaiLooped-Regular.ttf";
+let font = null;
+const cache = new Map();
+
+export async function loadFont() {
+  if (font) return font;
+  const buf = await fetch(FONT_URL).then((r) => r.arrayBuffer());
+  font = opentype.parse(buf);
+  return font;
+}
+
+// Разбиваем кубическую/квадратичную кривую на отрезки.
+function sampleCubic(p0, c1, c2, p1, steps, out) {
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps, u = 1 - t;
+    const x = u * u * u * p0[0] + 3 * u * u * t * c1[0] + 3 * u * t * t * c2[0] + t * t * t * p1[0];
+    const y = u * u * u * p0[1] + 3 * u * u * t * c1[1] + 3 * u * t * t * c2[1] + t * t * t * p1[1];
+    out.push([x, y]);
+  }
+}
+function sampleQuad(p0, c, p1, steps, out) {
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps, u = 1 - t;
+    const x = u * u * p0[0] + 2 * u * t * c[0] + t * t * p1[0];
+    const y = u * u * p0[1] + 2 * u * t * c[1] + t * t * p1[1];
+    out.push([x, y]);
+  }
+}
+
+// Геометрия глифа в нормализованном пространстве [0..1], вписанная в центр с полями.
+export function buildGlyph(text) {
+  if (cache.has(text)) return cache.get(text);
+  const path = font.getPath(text, 0, 0, 1000);
+  const bb = path.getBoundingBox();
+  const w = bb.x2 - bb.x1, h = bb.y2 - bb.y1;
+  const scale = 0.78 / Math.max(w, h, 1);
+  const cx = (bb.x1 + bb.x2) / 2, cy = (bb.y1 + bb.y2) / 2;
+  const nx = (x) => 0.5 + (x - cx) * scale;
+  const ny = (y) => 0.5 + (y - cy) * scale;
+
+  const commands = [];
+  const contours = [];
+  let cur = null, last = null, start = null;
+  for (const c of path.commands) {
+    if (c.type === "M") {
+      if (cur && cur.length > 1) contours.push(cur);
+      cur = [];
+      last = [nx(c.x), ny(c.y)];
+      start = last;
+      cur.push(last);
+      commands.push({ type: "M", x: last[0], y: last[1] });
+    } else if (c.type === "L") {
+      last = [nx(c.x), ny(c.y)];
+      cur.push(last);
+      commands.push({ type: "L", x: last[0], y: last[1] });
+    } else if (c.type === "C") {
+      const p1 = [nx(c.x), ny(c.y)];
+      sampleCubic(last, [nx(c.x1), ny(c.y1)], [nx(c.x2), ny(c.y2)], p1, 16, cur);
+      last = p1;
+      commands.push({ type: "C", x: p1[0], y: p1[1], x1: nx(c.x1), y1: ny(c.y1), x2: nx(c.x2), y2: ny(c.y2) });
+    } else if (c.type === "Q") {
+      const p1 = [nx(c.x), ny(c.y)];
+      sampleQuad(last, [nx(c.x1), ny(c.y1)], p1, 14, cur);
+      last = p1;
+      commands.push({ type: "Q", x: p1[0], y: p1[1], x1: nx(c.x1), y1: ny(c.y1) });
+    } else if (c.type === "Z") {
+      if (start) cur.push(start);
+      commands.push({ type: "Z" });
+    }
+  }
+  if (cur && cur.length > 1) contours.push(cur);
+
+  const glyph = { commands, contours };
+  cache.set(text, glyph);
+  return glyph;
+}
+
+// Path2D из нормализованных команд, отображённых в прямоугольник rect {x,y,size}.
+export function glyphPath2D(glyph, rect) {
+  const X = (n) => rect.x + n * rect.size;
+  const Y = (n) => rect.y + n * rect.size;
+  const p = new Path2D();
+  for (const c of glyph.commands) {
+    if (c.type === "M") p.moveTo(X(c.x), Y(c.y));
+    else if (c.type === "L") p.lineTo(X(c.x), Y(c.y));
+    else if (c.type === "C") p.bezierCurveTo(X(c.x1), Y(c.y1), X(c.x2), Y(c.y2), X(c.x), Y(c.y));
+    else if (c.type === "Q") p.quadraticCurveTo(X(c.x1), Y(c.y1), X(c.x), Y(c.y));
+    else if (c.type === "Z") p.closePath();
+  }
+  return p;
+}
+
+// Бледный шаблон глифа (заливка + тонкий контур) для режима обводки.
+export function drawTemplate(ctx, glyph, rect) {
+  const p = glyphPath2D(glyph, rect);
+  ctx.save();
+  ctx.fillStyle = "rgba(255,255,255,0.10)";
+  ctx.fill(p, "nonzero");
+  ctx.strokeStyle = "rgba(120,170,255,0.45)";
+  ctx.lineWidth = Math.max(1, rect.size * 0.006);
+  ctx.stroke(p);
+  ctx.restore();
+}

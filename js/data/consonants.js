@@ -1,0 +1,55 @@
+// 44 тайских согласных: символ, «имя» (буква + слово-подсказка), транскрипция RTGS,
+// начальный/конечный звук и класс тона (mid/high/low).
+//
+// Поле strokes — необязательные «осевые линии» штрихов в нормализованных координатах [0..1]
+// (в порядке написания) для педагогически верной анимации порядка штрихов.
+// Если strokes пуст, режим анимации автоматически обводит контур глифа из шрифта —
+// этого достаточно, чтобы увидеть форму, но не гарантирует правильный порядок штрихов.
+// Медианы добавляются постепенно, сверяясь с авторитетными источниками по тайскому письму.
+
+export const CONSONANTS = [
+  { char: "ก", name: "ก ไก่",     gloss: "курица",         rtgs: "ko kai",      initial: "k",  final: "k",  cls: "mid",  strokes: [] },
+  { char: "ข", name: "ข ไข่",     gloss: "яйцо",           rtgs: "kho khai",    initial: "kh", final: "k",  cls: "high", strokes: [] },
+  { char: "ฃ", name: "ฃ ขวด",     gloss: "бутылка (устар.)", rtgs: "kho khuat", initial: "kh", final: "k",  cls: "high", strokes: [] },
+  { char: "ค", name: "ค ควาย",   gloss: "буйвол",         rtgs: "kho khwai",   initial: "kh", final: "k",  cls: "low",  strokes: [] },
+  { char: "ฅ", name: "ฅ คน",      gloss: "человек (устар.)", rtgs: "kho khon",  initial: "kh", final: "k",  cls: "low",  strokes: [] },
+  { char: "ฆ", name: "ฆ ระฆัง",   gloss: "колокол",        rtgs: "kho rakhang", initial: "kh", final: "k",  cls: "low",  strokes: [] },
+  { char: "ง", name: "ง งู",      gloss: "змея",           rtgs: "ngo ngu",     initial: "ng", final: "ng", cls: "low",  strokes: [] },
+  { char: "จ", name: "จ จาน",     gloss: "тарелка",        rtgs: "cho chan",    initial: "ch", final: "t",  cls: "mid",  strokes: [] },
+  { char: "ฉ", name: "ฉ ฉิ่ง",    gloss: "цимбалы",        rtgs: "cho ching",   initial: "ch", final: "-",  cls: "high", strokes: [] },
+  { char: "ช", name: "ช ช้าง",    gloss: "слон",           rtgs: "cho chang",   initial: "ch", final: "t",  cls: "low",  strokes: [] },
+  { char: "ซ", name: "ซ โซ่",     gloss: "цепь",           rtgs: "so so",       initial: "s",  final: "t",  cls: "low",  strokes: [] },
+  { char: "ฌ", name: "ฌ เฌอ",     gloss: "дерево",         rtgs: "cho choe",    initial: "ch", final: "-",  cls: "low",  strokes: [] },
+  { char: "ญ", name: "ญ หญิง",    gloss: "женщина",        rtgs: "yo ying",     initial: "y",  final: "n",  cls: "low",  strokes: [] },
+  { char: "ฎ", name: "ฎ ชฎา",     gloss: "корона",         rtgs: "do chada",    initial: "d",  final: "t",  cls: "mid",  strokes: [] },
+  { char: "ฏ", name: "ฏ ปฏัก",    gloss: "стрекало",       rtgs: "to patak",    initial: "t",  final: "t",  cls: "mid",  strokes: [] },
+  { char: "ฐ", name: "ฐ ฐาน",     gloss: "пьедестал",      rtgs: "tho than",    initial: "th", final: "t",  cls: "high", strokes: [] },
+  { char: "ฑ", name: "ฑ มณโฑ",    gloss: "Монтхо",         rtgs: "tho montho",  initial: "th", final: "t",  cls: "low",  strokes: [] },
+  { char: "ฒ", name: "ฒ ผู้เฒ่า", gloss: "старец",         rtgs: "tho phuthao", initial: "th", final: "t",  cls: "low",  strokes: [] },
+  { char: "ณ", name: "ณ เณร",     gloss: "послушник",      rtgs: "no nen",      initial: "n",  final: "n",  cls: "low",  strokes: [] },
+  { char: "ด", name: "ด เด็ก",    gloss: "ребёнок",        rtgs: "do dek",      initial: "d",  final: "t",  cls: "mid",  strokes: [] },
+  { char: "ต", name: "ต เต่า",    gloss: "черепаха",       rtgs: "to tao",      initial: "t",  final: "t",  cls: "mid",  strokes: [] },
+  { char: "ถ", name: "ถ ถุง",     gloss: "мешок",          rtgs: "tho thung",   initial: "th", final: "t",  cls: "high", strokes: [] },
+  { char: "ท", name: "ท ทหาร",    gloss: "солдат",         rtgs: "tho thahan",  initial: "th", final: "t",  cls: "low",  strokes: [] },
+  { char: "ธ", name: "ธ ธง",      gloss: "флаг",           rtgs: "tho thong",   initial: "th", final: "t",  cls: "low",  strokes: [] },
+  { char: "น", name: "น หนู",     gloss: "мышь",           rtgs: "no nu",       initial: "n",  final: "n",  cls: "low",  strokes: [] },
+  { char: "บ", name: "บ ใบไม้",   gloss: "лист",           rtgs: "bo baimai",   initial: "b",  final: "p",  cls: "mid",  strokes: [] },
+  { char: "ป", name: "ป ปลา",     gloss: "рыба",           rtgs: "po pla",      initial: "p",  final: "p",  cls: "mid",  strokes: [] },
+  { char: "ผ", name: "ผ ผึ้ง",    gloss: "пчела",          rtgs: "pho phueng",  initial: "ph", final: "-",  cls: "high", strokes: [] },
+  { char: "ฝ", name: "ฝ ฝา",      gloss: "крышка",         rtgs: "fo fa",       initial: "f",  final: "-",  cls: "high", strokes: [] },
+  { char: "พ", name: "พ พาน",     gloss: "поднос",         rtgs: "pho phan",    initial: "ph", final: "p",  cls: "low",  strokes: [] },
+  { char: "ฟ", name: "ฟ ฟัน",     gloss: "зубы",           rtgs: "fo fan",      initial: "f",  final: "p",  cls: "low",  strokes: [] },
+  { char: "ภ", name: "ภ สำเภา",   gloss: "парусник",       rtgs: "pho samphao", initial: "ph", final: "p",  cls: "low",  strokes: [] },
+  { char: "ม", name: "ม ม้า",     gloss: "лошадь",         rtgs: "mo ma",       initial: "m",  final: "m",  cls: "low",  strokes: [] },
+  { char: "ย", name: "ย ยักษ์",   gloss: "якша (демон)",   rtgs: "yo yak",      initial: "y",  final: "y",  cls: "low",  strokes: [] },
+  { char: "ร", name: "ร เรือ",    gloss: "лодка",          rtgs: "ro ruea",     initial: "r",  final: "n",  cls: "low",  strokes: [] },
+  { char: "ล", name: "ล ลิง",     gloss: "обезьяна",       rtgs: "lo ling",     initial: "l",  final: "n",  cls: "low",  strokes: [] },
+  { char: "ว", name: "ว แหวน",    gloss: "кольцо",         rtgs: "wo waen",     initial: "w",  final: "w",  cls: "low",  strokes: [] },
+  { char: "ศ", name: "ศ ศาลา",    gloss: "беседка",        rtgs: "so sala",     initial: "s",  final: "t",  cls: "high", strokes: [] },
+  { char: "ษ", name: "ษ ฤๅษี",    gloss: "отшельник",      rtgs: "so ruesi",    initial: "s",  final: "t",  cls: "high", strokes: [] },
+  { char: "ส", name: "ส เสือ",    gloss: "тигр",           rtgs: "so suea",     initial: "s",  final: "t",  cls: "high", strokes: [] },
+  { char: "ห", name: "ห หีบ",     gloss: "сундук",         rtgs: "ho hip",      initial: "h",  final: "-",  cls: "high", strokes: [] },
+  { char: "ฬ", name: "ฬ จุฬา",    gloss: "воздушный змей", rtgs: "lo chula",    initial: "l",  final: "n",  cls: "low",  strokes: [] },
+  { char: "อ", name: "อ อ่าง",    gloss: "таз",            rtgs: "o ang",       initial: "-",  final: "-",  cls: "mid",  strokes: [] },
+  { char: "ฮ", name: "ฮ นกฮูก",   gloss: "сова",           rtgs: "ho nok huk",  initial: "h",  final: "-",  cls: "low",  strokes: [] },
+];
