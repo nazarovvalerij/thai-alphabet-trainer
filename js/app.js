@@ -5,15 +5,10 @@ import { loadFont, buildGlyph, drawTemplate, drawHint, glyphSkeleton } from "./t
 import { Ink } from "./pointer.js";
 import { SRS } from "./srs.js";
 import { initAudio, isAudioAvailable, speakThai } from "./audio.js";
+import { t, getLang, setLang, glossOf } from "./i18n.js";
 
-const APP_VERSION = "v12"; // временный индикатор версии (виден в шапке) — для отладки прогрузки
-const CLS = { mid: "средний", high: "высокий", low: "низкий" };
-const LEN = { short: "краткая", long: "долгая" };
-const POS = { before: "перед", after: "после", above: "сверху", below: "снизу", around: "вокруг" };
-const MODES = [
-  { id: "trace", label: "Обводка" },
-  { id: "recall", label: "Память" },
-];
+const APP_VERSION = "v13"; // временный индикатор версии (виден в шапке) — для отладки прогрузки
+const MODE_IDS = ["trace", "recall"];
 
 // Уникальный id карточки для SRS.
 const cardId = (item) => "c:" + (item.char || item.display);
@@ -73,9 +68,29 @@ const App = {
     initAudio();
     const ver = document.getElementById("ver");
     if (ver) ver.textContent = APP_VERSION;
+    this._wireLang();
     this.board = new Board();
     await loadFont();
     this._wireResize();
+    this.showHome();
+  },
+
+  _wireLang() {
+    const btn = document.getElementById("lang");
+    if (!btn) return;
+    const sync = () => { btn.textContent = getLang() === "ru" ? "EN" : "RU"; };
+    sync();
+    btn.onclick = () => {
+      setLang(getLang() === "ru" ? "en" : "ru");
+      sync();
+      this._refresh();
+    };
+  },
+
+  // Перерисовать текущий экран (после смены языка).
+  _refresh() {
+    if (this.srs) { this._srsShow(); return; }
+    if (document.querySelector(".stage")) { this.showPractice(this.index, this.mode); return; }
     this.showHome();
   },
 
@@ -108,18 +123,18 @@ const App = {
     const sum = SRS.summary(ids);
     root.innerHTML = `
       <div class="home">
-        <h1>Тайский алфавит<span>тренажёр письма от руки</span></h1>
+        <h1>${t("app.title")}<span>${t("app.subtitle")}</span></h1>
         <div class="seg setseg">
-          <button data-set="consonants" class="${this.setName === "consonants" ? "on" : ""}">Согласные (44)</button>
-          <button data-set="vowels" class="${this.setName === "vowels" ? "on" : ""}">Гласные</button>
+          <button data-set="consonants" class="${this.setName === "consonants" ? "on" : ""}">${t("set.consonants")} (44)</button>
+          <button data-set="vowels" class="${this.setName === "vowels" ? "on" : ""}">${t("set.vowels")}</button>
         </div>
         <button class="srs-card">
-          <div class="srs-title">▶ Повторение (SRS)</div>
-          <div class="srs-stats">к повторению: <b>${sum.due}</b> · новых: ${sum.fresh} · выучено: ${sum.learned} / ${sum.total}</div>
+          <div class="srs-title">${t("srs.title")}</div>
+          <div class="srs-stats">${t("srs.due")}: <b>${sum.due}</b> · ${t("srs.new")}: ${sum.fresh} · ${t("srs.learned")}: ${sum.learned} / ${sum.total}</div>
         </button>
-        <h2>Все буквы — выбери для тренировки</h2>
+        <h2>${t("home.pick")}</h2>
         <div class="grid"></div>
-        <div class="hint">Совет: открой на телефоне, добавь на домашний экран — работает офлайн. Пиши стилусом S-Pen прямо по экрану.</div>
+        <div class="hint">${t("home.hint")}</div>
       </div>`;
     const grid = root.querySelector(".grid");
     this.items().forEach((it, i) => {
@@ -146,14 +161,14 @@ const App = {
     const root = document.getElementById("screen");
     root.innerHTML = `
       <div class="seg modeseg">
-        ${MODES.map((m) => `<button data-mode="${m.id}" class="${m.id === mode ? "on" : ""}">${m.label}</button>`).join("")}
+        ${MODE_IDS.map((id) => `<button data-mode="${id}" class="${id === mode ? "on" : ""}">${t("mode." + id)}</button>`).join("")}
       </div>
       <div class="info"></div>
       <div class="controls"></div>
       <div class="nav">
-        <button class="prev">‹ Назад</button>
+        <button class="prev">${t("nav.back")}</button>
         <span class="counter"></span>
-        <button class="next">Вперёд ›</button>
+        <button class="next">${t("nav.next")}</button>
       </div>
       <div class="stage"></div>`;
     const stage = root.querySelector(".stage");
@@ -171,7 +186,7 @@ const App = {
     root.querySelector(".counter").textContent = `${index + 1} / ${this.items().length}`;
 
     this._renderMode(item);
-    this._setTitle(this.setName === "consonants" ? "Согласные" : "Гласные", true);
+    this._setTitle(this.setName === "consonants" ? t("set.consonants") : t("set.vowels"), true);
   },
 
   _go(delta) {
@@ -191,15 +206,15 @@ const App = {
     if (this.mode === "trace") {
       this.board.showHint(glyph);
       this._infoFull(info, item);
-      this._btn(controls, "Отменить", () => this.board.ink.undo());
-      this._btn(controls, "Очистить", () => this.board.ink.clear());
-      this._btn(controls, "Проверить", () => this._checkAccuracy(glyph, info, item));
+      this._btn(controls, t("ctl.undo"), () => this.board.ink.undo());
+      this._btn(controls, t("ctl.clear"), () => this.board.ink.clear());
+      this._btn(controls, t("ctl.check"), () => this._checkAccuracy(glyph, info, item));
     } else if (this.mode === "recall") {
       this.board.clearTemplate();
       this._infoPrompt(info, item);
-      this._btn(controls, "Отменить", () => this.board.ink.undo());
-      this._btn(controls, "Очистить", () => this.board.ink.clear());
-      this._btn(controls, "Показать эталон", () => {
+      this._btn(controls, t("ctl.undo"), () => this.board.ink.undo());
+      this._btn(controls, t("ctl.clear"), () => this.board.ink.clear());
+      this._btn(controls, t("ctl.showAnswer"), () => {
         this.revealed = true;
         this.board.drawTpl(glyph);
         this._infoFull(info, item);
@@ -209,31 +224,32 @@ const App = {
   },
 
   _infoFull(info, item) {
+    const gloss = glossOf(item);
     const extra = item.cls
-      ? `класс тона: <b>${CLS[item.cls]}</b> · ${item.initial}${item.final !== "-" ? "/" + item.final : ""}`
-      : `${LEN[item.length]} · ${POS[item.placement]}`;
+      ? `${t("info.toneClass")}: <b>${t("cls." + item.cls)}</b> · ${item.initial}${item.final !== "-" ? "/" + item.final : ""}`
+      : `${t("len." + item.length)} · ${t("pos." + item.placement)}`;
     info.innerHTML = `
       <div class="big">${item.char || item.display}</div>
       <div class="meta"><b>${item.name}</b> · <span class="rtgs">${item.rtgs}</span></div>
-      <div class="sub">${item.gloss ? "«" + item.gloss + "» · " : ""}${extra}</div>`;
+      <div class="sub">${gloss ? "«" + gloss + "» · " : ""}${extra}</div>`;
     this._audioBtn(item);
   },
 
   _infoPrompt(info, item) {
+    const gloss = glossOf(item);
     const prompt = item.cls
-      ? `<span class="rtgs">${item.rtgs}</span> · «${item.gloss}» · класс ${CLS[item.cls]}`
-      : `<span class="rtgs">${item.rtgs}</span> · ${LEN[item.length]}, ${POS[item.placement]}`;
-    info.innerHTML = `<div class="prompt">Напиши букву по памяти:</div><div class="prompt-hint">${prompt}</div>`;
+      ? `<span class="rtgs">${item.rtgs}</span> · «${gloss}» · ${t("prompt.class")} ${t("cls." + item.cls)}`
+      : `<span class="rtgs">${item.rtgs}</span> · ${t("len." + item.length)}, ${t("pos." + item.placement)}`;
+    info.innerHTML = `<div class="prompt">${t("prompt.fromMemory")}</div><div class="prompt-hint">${prompt}</div>`;
     this._audioBtn(item);
   },
 
   _renderGrades(controls, item) {
     controls.innerHTML = "";
-    const grades = [["again", "Снова"], ["hard", "Трудно"], ["good", "Хорошо"], ["easy", "Легко"]];
-    for (const [g, label] of grades) {
+    for (const g of ["again", "hard", "good", "easy"]) {
       const b = document.createElement("button");
       b.className = "grade grade-" + g;
-      b.textContent = label;
+      b.textContent = t("grade." + g);
       b.onclick = () => this._afterGrade(item, g);
       controls.appendChild(b);
     }
@@ -251,7 +267,7 @@ const App = {
 
     const raw = this.board.ink.allPoints();
     if (raw.length < 5) {
-      note.textContent = "Сначала напишите букву";
+      note.textContent = t("check.writeFirst");
       note.style.color = "#e8c04a";
       return;
     }
@@ -268,7 +284,7 @@ const App = {
     }
     const w = maxX - minX, h = maxY - minY;
     if (Math.max(w, h) < 0.02) {
-      note.textContent = "Напишите букву покрупнее";
+      note.textContent = t("check.writeLarger");
       note.style.color = "#e8c04a";
       return;
     }
@@ -306,7 +322,7 @@ const App = {
     // буквы (например, петлю), recall не даёт зачесть неполную форму. TOL/пороги можно подстроить.
     const pct = Math.round(100 * precision * precision * recall);
     // Временная отладочная разбивка: p = precision, r = recall, sk = число точек скелета.
-    note.textContent = `Совпадение с буквой: ${pct}%  (p${Math.round(precision * 100)}·r${Math.round(recall * 100)}, sk${sk.length})`;
+    note.textContent = `${t("check.match")}: ${pct}%  (p${Math.round(precision * 100)}·r${Math.round(recall * 100)}, sk${sk.length})`;
     note.style.color = pct >= 65 ? "#6ad19a" : pct >= 40 ? "#e8c04a" : "#e87a7a";
   },
 
@@ -317,7 +333,7 @@ const App = {
     items.forEach((it, i) => { if (SRS.isDue(cardId(it))) queue.push(i); });
     if (!queue.length) {
       const root = document.getElementById("screen");
-      root.innerHTML = `<div class="done"><h2>Пока нечего повторять 🎉</h2><p>Все карточки этого набора повторены. Возвращайся позже.</p><button class="back-home">На главную</button></div>`;
+      root.innerHTML = `<div class="done"><h2>${t("srs.nothingTitle")}</h2><p>${t("srs.nothingText")}</p><button class="back-home">${t("srs.toHome")}</button></div>`;
       root.querySelector(".back-home").onclick = () => this.showHome();
       this._setTitle("");
       return;
@@ -333,7 +349,7 @@ const App = {
     const nav = document.querySelector(".nav");
     nav.querySelector(".prev").style.visibility = "hidden";
     nav.querySelector(".next").style.visibility = "hidden";
-    nav.querySelector(".counter").textContent = `Повторение: ${this.srs.pos + 1} / ${this.srs.total}`;
+    nav.querySelector(".counter").textContent = `${t("srs.progress")}: ${this.srs.pos + 1} / ${this.srs.total}`;
   },
 
   _srsAdvance(grade) {
@@ -341,7 +357,7 @@ const App = {
     this.srs.pos++;
     if (this.srs.pos >= this.srs.queue.length) {
       const root = document.getElementById("screen");
-      root.innerHTML = `<div class="done"><h2>Сессия завершена 🎉</h2><p>Повторено карточек: ${this.srs.total}.</p><button class="back-home">На главную</button></div>`;
+      root.innerHTML = `<div class="done"><h2>${t("srs.doneTitle")}</h2><p>${t("srs.doneText")} ${this.srs.total}.</p><button class="back-home">${t("srs.toHome")}</button></div>`;
       root.querySelector(".back-home").onclick = () => this.showHome();
       this.srs = null;
       this._setTitle("");
@@ -366,7 +382,7 @@ const App = {
     const b = document.createElement("button");
     b.className = "icon-btn";
     b.textContent = "🔊";
-    b.title = "Произнести";
+    b.title = t("audio.speak");
     b.onclick = () => speakThai(item.char || item.display);
     bar.appendChild(b);
   },
