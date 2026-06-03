@@ -1,3 +1,11 @@
+/* Тот же шрифт, что и эталон/обводка (Noto Sans Thai Looped) — чтобы показанная буква
+   совпадала по начертанию с подсказкой и тем, что нужно писать. */
+@font-face {
+  font-family: "ThaiLooped";
+  src: url("../fonts/NotoSansThaiLooped-Regular.ttf") format("truetype");
+  font-display: swap;
+}
+
 :root {
   --bg: #0e1320;
   --panel: #19203150;
@@ -65,7 +73,8 @@ body {
   border-radius: 14px; color: var(--text); cursor: pointer; display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 2px;
 }
-.cell .glyph { font-size: 30px; line-height: 1; }
+.info .meta b { font-family: "ThaiLooped", system-ui, sans-serif; font-weight: 400; }
+.cell .glyph { font-size: 30px; line-height: 1; font-family: "ThaiLooped", system-ui, sans-serif; }
 .cell .lbl { font-size: 11px; color: var(--muted); }
 .cell .dot { position: absolute; top: 7px; right: 7px; width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
 .cell:active { transform: scale(0.97); }
@@ -79,7 +88,7 @@ body {
 .layer-ink { z-index: 3; }
 
 .info { text-align: center; padding: 4px 12px; min-height: 64px; }
-.info .big { font-size: 30px; line-height: 1.1; }
+.info .big { font-size: 30px; line-height: 1.1; font-family: "ThaiLooped", system-ui, sans-serif; }
 .info .meta { margin-top: 2px; }
 .info .meta .rtgs, .prompt-hint .rtgs { color: var(--accent); font-weight: 600; }
 .info .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
