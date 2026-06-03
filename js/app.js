@@ -7,7 +7,7 @@ import { SRS } from "./srs.js";
 import { initAudio, isAudioAvailable, speakThai } from "./audio.js";
 import { t, getLang, setLang, glossOf } from "./i18n.js";
 
-const APP_VERSION = "v16"; // временный индикатор версии (виден в шапке) — для отладки прогрузки
+const APP_VERSION = "v17"; // временный индикатор версии (виден в шапке) — для отладки прогрузки
 const MODE_IDS = ["trace", "recall"];
 
 // Уникальный id карточки для SRS.

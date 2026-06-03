@@ -37,7 +37,7 @@ js/audio.js                озвучка (Web Speech API)
 js/data/consonants.js      44 согласных + метаданные
 js/data/vowels.js          основные гласные + метаданные
 lib/opentype.min.js        парсер шрифта (SIL OFL / MIT)
-fonts/                     Noto Sans Thai (печатный, SIL OFL 1.1) — чёткие, различимые буквы
+fonts/                     Mali (рукописный тайский, SIL OFL 1.1) — почерк + различимые буквы
 sw.js, manifest.webmanifest, icons/   PWA
 ```
 

@@ -1,8 +1,8 @@
-/* Печатный тайский шрифт (Noto Sans Thai, OFL) — буквы чётко различимы
-   (в т.ч. близнецы ฆ/ม, ข/ฃ), в отличие от петлевого стиля. */
+/* Рукописный тайский шрифт (Mali, OFL) — похож на письмо от руки,
+   при этом буквы-близнецы (ฆ/ม, ข/ฃ) остаются различимыми. */
 @font-face {
   font-family: "ThaiUI";
-  src: url("../fonts/NotoSansThai-Regular.ttf") format("truetype");
+  src: url("../fonts/Mali-Regular.ttf") format("truetype");
   font-display: swap;
 }
 
