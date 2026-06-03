@@ -1,7 +1,7 @@
 // Главный контроллер: состояние, экраны и склейка модулей.
 import { CONSONANTS } from "./data/consonants.js";
 import { VOWELS } from "./data/vowels.js";
-import { loadFont, buildGlyph, drawTemplate, sampleInterior } from "./template.js";
+import { loadFont, buildGlyph, drawTemplate, drawHint, glyphSkeleton } from "./template.js";
 import { Ink } from "./pointer.js";
 import { SRS } from "./srs.js";
 import { initAudio, isAudioAvailable, speakThai } from "./audio.js";
@@ -50,6 +50,11 @@ class Board {
   }
   clearTemplate() { this.tpl.getContext("2d").clearRect(0, 0, this.size, this.size); }
   drawTpl(glyph) { this.clearTemplate(); drawTemplate(this.tpl.getContext("2d"), glyph, this.getRect()); }
+  showHint(glyph) {
+    this.clearTemplate();
+    const size = Math.max(56, Math.round(this.size * 0.2));
+    drawHint(this.tpl.getContext("2d"), glyph, { x: 10, y: 10, size });
+  }
   setInkEnabled(on) { this.inkCanvas.style.pointerEvents = on ? "auto" : "none"; }
 }
 
@@ -88,6 +93,7 @@ const App = {
     const glyph = buildGlyph(glyphText(item));
     this.board.ink.redraw();
     if (this.mode === "recall" && !this.revealed) this.board.clearTemplate();
+    else if (this.mode === "trace") this.board.showHint(glyph);
     else this.board.drawTpl(glyph);
   },
 
@@ -180,7 +186,7 @@ const App = {
     this.board.setInkEnabled(true);
 
     if (this.mode === "trace") {
-      this.board.drawTpl(glyph);
+      this.board.showHint(glyph);
       this._infoFull(info, item);
       this._btn(controls, "Отменить", () => this.board.ink.undo());
       this._btn(controls, "Очистить", () => this.board.ink.clear());
@@ -267,36 +273,33 @@ const App = {
     const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
     const pts = raw.map((p) => ({ x: 0.5 + (p.x - cx) * scale, y: 0.5 + (p.y - cy) * scale }));
 
-    // Семплы внутри формы буквы (в нормализованных координатах [0..1]).
-    const interior = sampleInterior(glyph);
-    const BAND = 0.05;   // допуск «линия на букве» (точность)
-    const REACH = 0.07;  // радиус охвата; меньше → строже к расположению штрихов (различение похожих букв)
+    // Сравниваем форму со СКЕЛЕТОМ (медиальной осью) буквы — это различает похожие буквы,
+    // т.к. сравнивается ход осевых линий, а не общая площадь силуэта.
+    const sk = glyphSkeleton(glyph);
+    if (!sk.length) { note.textContent = "—"; note.style.color = "#e8c04a"; return; }
 
-    // Точность: доля точек рукописи, попавших внутрь формы буквы (с допуском на дрожь руки).
-    let onLetter = 0;
+    // Двусторонняя Chamfer-дистанция (среднее) между линией пользователя и скелетом буквы:
+    //   dPS — насколько ваши штрихи лежат на осях буквы (наказывает лишнее «не там»);
+    //   dSP — насколько вы прошли все оси буквы (наказывает недостающее).
+    let sumPS = 0;
     for (const p of pts) {
-      let best = Infinity;
-      for (const s of interior) {
-        const d = Math.hypot(p.x - s[0], p.y - s[1]);
-        if (d < best) { best = d; if (best <= BAND) break; }
-      }
-      if (best <= BAND) onLetter++;
+      let m = Infinity;
+      for (const s of sk) { const dx = p.x - s[0], dy = p.y - s[1], d = dx * dx + dy * dy; if (d < m) m = d; }
+      sumPS += Math.sqrt(m);
     }
-    const precision = onLetter / pts.length;
-
-    // Охват: доля площади буквы, рядом с которой прошла линия (наказывает недописанное).
-    let reached = 0;
-    for (const s of interior) {
-      for (const p of pts) {
-        if (Math.hypot(p.x - s[0], p.y - s[1]) <= REACH) { reached++; break; }
-      }
+    let sumSP = 0;
+    for (const s of sk) {
+      let m = Infinity;
+      for (const p of pts) { const dx = p.x - s[0], dy = p.y - s[1], d = dx * dx + dy * dy; if (d < m) m = d; }
+      sumSP += Math.sqrt(m);
     }
-    const coverage = interior.length ? reached / interior.length : 0;
+    const D = (sumPS / pts.length + sumSP / sk.length) / 2;
 
-    // Итог — среднее геометрическое: штрафует и «грязь» снаружи, и неполную форму.
-    const pct = Math.round(100 * Math.sqrt(precision * coverage));
+    // Дистанция → проценты (D≈DMIN → 100%, D≥DMAX → 0%). Пороги можно подстроить.
+    const DMIN = 0.03, DMAX = 0.17;
+    const pct = Math.round(100 * Math.min(1, Math.max(0, (DMAX - D) / (DMAX - DMIN))));
     note.textContent = `Совпадение с буквой: ${pct}%`;
-    note.style.color = pct >= 80 ? "#6ad19a" : pct >= 55 ? "#e8c04a" : "#e87a7a";
+    note.style.color = pct >= 75 ? "#6ad19a" : pct >= 50 ? "#e8c04a" : "#e87a7a";
   },
 
   // ---------- SRS-сессия ----------

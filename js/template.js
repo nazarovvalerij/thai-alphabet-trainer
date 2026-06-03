@@ -96,21 +96,78 @@ export function glyphPath2D(glyph, rect) {
   return p;
 }
 
-// Точки-семплы ВНУТРИ заливки глифа (нормализованное пространство [0..1]).
-// Используются для оценки обводки: точность (линия внутри буквы) и охват (вся буква пройдена).
-// Результат кешируется на самом объекте глифа.
-export function sampleInterior(glyph, step = 0.025) {
-  if (glyph._interior) return glyph._interior;
+// Скелет (медиальная ось) глифа в нормализованном пространстве [0..1].
+// Считаем дистанционное преобразование заливки (расстояние до фона), затем берём «гребень»
+// (локальные максимумы) — это осевые линии буквы. Используется для оценки рукописи
+// двусторонней Chamfer-дистанцией. Результат кешируется на объекте глифа.
+export function glyphSkeleton(glyph, step = 0.015) {
+  if (glyph._skeleton && glyph._skeleton.step === step) return glyph._skeleton.pts;
+  const n = Math.ceil(1 / step);
   const ctx = document.createElement("canvas").getContext("2d");
   const path = glyphPath2D(glyph, { x: 0, y: 0, size: 1 });
-  const pts = [];
-  for (let y = step / 2; y < 1; y += step) {
-    for (let x = step / 2; x < 1; x += step) {
-      if (ctx.isPointInPath(path, x, y, "nonzero")) pts.push([x, y]);
+
+  // Маска заливки по сетке.
+  const inFill = new Uint8Array(n * n);
+  for (let j = 0; j < n; j++) {
+    for (let i = 0; i < n; i++) {
+      inFill[j * n + i] = ctx.isPointInPath(path, (i + 0.5) * step, (j + 0.5) * step, "nonzero") ? 1 : 0;
     }
   }
-  glyph._interior = pts;
+
+  // Дистанционное преобразование (chamfer, два прохода): расстояние до ближайшего фона, в клетках.
+  const INF = 1e9, D1 = 1, D2 = Math.SQRT2;
+  const dist = new Float32Array(n * n);
+  for (let k = 0; k < n * n; k++) dist[k] = inFill[k] ? INF : 0;
+  const relax = (k, nk, w) => { if (dist[nk] + w < dist[k]) dist[k] = dist[nk] + w; };
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    const k = j * n + i;
+    if (!inFill[k]) continue;
+    if (i > 0) relax(k, k - 1, D1);
+    if (j > 0) relax(k, k - n, D1);
+    if (i > 0 && j > 0) relax(k, k - n - 1, D2);
+    if (i < n - 1 && j > 0) relax(k, k - n + 1, D2);
+  }
+  for (let j = n - 1; j >= 0; j--) for (let i = n - 1; i >= 0; i--) {
+    const k = j * n + i;
+    if (!inFill[k]) continue;
+    if (i < n - 1) relax(k, k + 1, D1);
+    if (j < n - 1) relax(k, k + n, D1);
+    if (i < n - 1 && j < n - 1) relax(k, k + n + 1, D2);
+    if (i > 0 && j < n - 1) relax(k, k + n - 1, D2);
+  }
+
+  // Гребень дистанции (подавление немаксимумов вдоль осей) = медиальная ось.
+  const at = (i, j) => (i < 0 || j < 0 || i >= n || j >= n) ? 0 : dist[j * n + i];
+  const TH = 1.5; // отбрасываем тонкую кромку у контура
+  const pts = [];
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    const d = dist[j * n + i];
+    if (!inFill[j * n + i] || d < TH) continue;
+    const h = d >= at(i - 1, j) && d >= at(i + 1, j);
+    const v = d >= at(i, j - 1) && d >= at(i, j + 1);
+    if (h || v) pts.push([(i + 0.5) * step, (j + 0.5) * step]);
+  }
+
+  glyph._skeleton = { step, pts };
   return pts;
+}
+
+// Маленькая подсказка-эталон (что нужно написать) — рисуется в углу, поле остаётся свободным.
+export function drawHint(ctx, glyph, rect) {
+  const { x, y, size } = rect;
+  ctx.save();
+  ctx.beginPath();
+  const r = Math.max(8, size * 0.16);
+  if (ctx.roundRect) ctx.roundRect(x, y, size, size, r); else ctx.rect(x, y, size, size);
+  ctx.fillStyle = "rgba(20,27,42,0.9)";
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(120,170,255,0.4)";
+  ctx.stroke();
+  const p = glyphPath2D(glyph, { x, y, size });
+  ctx.fillStyle = "rgba(234,242,255,0.92)";
+  ctx.fill(p, "nonzero");
+  ctx.restore();
 }
 
 // Бледный шаблон глифа (заливка + тонкий контур) для режима обводки.
