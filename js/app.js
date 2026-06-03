@@ -139,14 +139,14 @@ const App = {
       <div class="seg modeseg">
         ${MODES.map((m) => `<button data-mode="${m.id}" class="${m.id === mode ? "on" : ""}">${m.label}</button>`).join("")}
       </div>
-      <div class="stage"></div>
       <div class="info"></div>
       <div class="controls"></div>
       <div class="nav">
         <button class="prev">‹ Назад</button>
         <span class="counter"></span>
         <button class="next">Вперёд ›</button>
-      </div>`;
+      </div>
+      <div class="stage"></div>`;
     const stage = root.querySelector(".stage");
     stage.appendChild(this.board.el);
     this._ro.disconnect();

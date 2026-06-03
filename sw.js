@@ -1,5 +1,5 @@
 // Service worker: офлайн-кеш ассетов (cache-first для статики приложения).
-const CACHE = "thai-trainer-v2";
+const CACHE = "thai-trainer-v3";
 const ASSETS = [
   "./",
   "./index.html",
