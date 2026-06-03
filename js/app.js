@@ -6,7 +6,7 @@ import { Ink } from "./pointer.js";
 import { SRS } from "./srs.js";
 import { initAudio, isAudioAvailable, speakThai } from "./audio.js";
 
-const APP_VERSION = "v9"; // временный индикатор версии (виден в шапке) — для отладки прогрузки
+const APP_VERSION = "v10"; // временный индикатор версии (виден в шапке) — для отладки прогрузки
 const CLS = { mid: "средний", high: "высокий", low: "низкий" };
 const LEN = { short: "краткая", long: "долгая" };
 const POS = { before: "перед", after: "после", above: "сверху", below: "снизу", around: "вокруг" };
@@ -272,19 +272,25 @@ const App = {
       note.style.color = "#e8c04a";
       return;
     }
-    const scale = 0.78 / Math.max(w, h);
-    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
-    const pts = raw.map((p) => ({ x: 0.5 + (p.x - cx) * scale, y: 0.5 + (p.y - cy) * scale }));
+    // Растягиваем рамку рукописи в единичный квадрат [0..1]² (НЕ сохраняя пропорции):
+    // совпадение не зависит ни от места, ни от размера, ни от вытянутости начертания.
+    const iw = Math.max(w, 1e-3), ih = Math.max(h, 1e-3);
+    const pts = raw.map((p) => ({ x: (p.x - minX) / iw, y: (p.y - minY) / ih }));
 
     // Сравниваем форму со СКЕЛЕТОМ (медиальной осью) буквы — это различает похожие буквы,
     // т.к. сравнивается ход осевых линий, а не общая площадь силуэта.
-    const sk = glyphSkeleton(glyph);
-    if (!sk.length) { note.textContent = "—"; note.style.color = "#e8c04a"; return; }
+    const sk0 = glyphSkeleton(glyph);
+    if (!sk0.length) { note.textContent = "—"; note.style.color = "#e8c04a"; return; }
+    // Скелет тоже растягиваем в единичный квадрат — сравниваем форму в одинаковой системе.
+    let kx0 = Infinity, ky0 = Infinity, kx1 = -Infinity, ky1 = -Infinity;
+    for (const s of sk0) { if (s[0] < kx0) kx0 = s[0]; if (s[0] > kx1) kx1 = s[0]; if (s[1] < ky0) ky0 = s[1]; if (s[1] > ky1) ky1 = s[1]; }
+    const kw = Math.max(kx1 - kx0, 1e-3), kh = Math.max(ky1 - ky0, 1e-3);
+    const sk = sk0.map((s) => [(s[0] - kx0) / kw, (s[1] - ky0) / kh]);
 
     // Сопоставление со скелетом по порогу TOL (строго к расположению штрихов):
     //   precision — доля рукописи, лежащей НА осях буквы (наказывает лишние штрихи «не там», напр. петлю);
     //   recall    — доля осей буквы, ПРОЙДЕННЫХ рукописью (наказывает недостающие части).
-    const TOL = 0.05, TOL2 = TOL * TOL;
+    const TOL = 0.06, TOL2 = TOL * TOL;
     let onAxis = 0;
     for (const p of pts) {
       for (const s of sk) { const dx = p.x - s[0], dy = p.y - s[1]; if (dx * dx + dy * dy <= TOL2) { onAxis++; break; } }
