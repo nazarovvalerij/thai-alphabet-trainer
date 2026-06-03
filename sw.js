@@ -1,5 +1,6 @@
-// Service worker: офлайн-кеш ассетов (cache-first для статики приложения).
-const CACHE = "thai-trainer-v6";
+// Service worker: network-first — при наличии сети всегда берём свежую версию и обновляем кеш,
+// офлайн — отдаём из кеша. (Раньше был cache-first, из-за чего обновления не подхватывались.)
+const CACHE = "thai-trainer-v7";
 const ASSETS = [
   "./",
   "./index.html",
@@ -32,10 +33,12 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
   e.respondWith(
-    caches.match(e.request).then((hit) => hit || fetch(e.request).then((resp) => {
-      const copy = resp.clone();
-      caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
-      return resp;
-    }).catch(() => caches.match("./index.html")))
+    fetch(e.request)
+      .then((resp) => {
+        const copy = resp.clone();
+        caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
+        return resp;
+      })
+      .catch(() => caches.match(e.request).then((hit) => hit || caches.match("./index.html")))
   );
 });
