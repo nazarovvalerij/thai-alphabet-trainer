@@ -1,8 +1,8 @@
-/* Тот же шрифт, что и эталон/обводка (Noto Sans Thai Looped) — чтобы показанная буква
-   совпадала по начертанию с подсказкой и тем, что нужно писать. */
+/* Печатный тайский шрифт (Noto Sans Thai, OFL) — буквы чётко различимы
+   (в т.ч. близнецы ฆ/ม, ข/ฃ), в отличие от петлевого стиля. */
 @font-face {
-  font-family: "ThaiLooped";
-  src: url("../fonts/NotoSansThaiLooped-Regular.ttf") format("truetype");
+  font-family: "ThaiUI";
+  src: url("../fonts/NotoSansThai-Regular.ttf") format("truetype");
   font-display: swap;
 }
 
@@ -73,8 +73,8 @@ body {
   border-radius: 14px; color: var(--text); cursor: pointer; display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 2px;
 }
-.info .meta b { font-family: "ThaiLooped", system-ui, sans-serif; font-weight: 400; }
-.cell .glyph { font-size: 30px; line-height: 1; font-family: "ThaiLooped", system-ui, sans-serif; }
+.info .meta b { font-family: "ThaiUI", system-ui, sans-serif; font-weight: 400; }
+.cell .glyph { font-size: 30px; line-height: 1; font-family: "ThaiUI", system-ui, sans-serif; }
 .cell .lbl { font-size: 11px; color: var(--muted); }
 .cell .dot { position: absolute; top: 7px; right: 7px; width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
 .cell:active { transform: scale(0.97); }
@@ -88,14 +88,14 @@ body {
 .layer-ink { z-index: 3; }
 
 .info { text-align: center; padding: 4px 12px; min-height: 64px; }
-.info .big { font-size: 30px; line-height: 1.1; font-family: "ThaiLooped", system-ui, sans-serif; }
+.info .big { font-size: 30px; line-height: 1.1; font-family: "ThaiUI", system-ui, sans-serif; }
 .info .meta { margin-top: 2px; }
 .info .meta .rtgs, .prompt-hint .rtgs { color: var(--accent); font-weight: 600; }
 .info .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
 .info .prompt { color: var(--muted); font-size: 14px; }
 .info .prompt-hint { font-size: 22px; margin-top: 6px; }
 .accuracy { margin-top: 6px; font-weight: 600; }
-.accuracy .rec-glyph { font-family: "ThaiLooped", system-ui, sans-serif; font-size: 22px; }
+.accuracy .rec-glyph { font-family: "ThaiUI", system-ui, sans-serif; font-size: 22px; }
 .accuracy .rec-pct { color: var(--muted); font-weight: 400; }
 
 .controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 4px 12px; }

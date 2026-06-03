@@ -1,10 +1,10 @@
-// Работа со шрифтом: загрузка Noto Sans Thai Looped и извлечение геометрии глифа.
+// Работа со шрифтом: загрузка Noto Sans Thai (печатный, OFL) и извлечение геометрии глифа.
 // Геометрия возвращается в нормализованных координатах [0..1] (независимо от размера канвы):
 //   - commands: команды контура, перенесённые в нормализованное пространство (для заливки Path2D);
 //   - contours: набор полилиний (плоские точки [x,y]) — для анимации и подсказки точности.
 // opentype — глобальный объект из lib/opentype.min.js (подключается обычным <script>).
 
-const FONT_URL = "fonts/NotoSansThaiLooped-Regular.ttf";
+const FONT_URL = "fonts/NotoSansThai-Regular.ttf";
 let font = null;
 const cache = new Map();
 
