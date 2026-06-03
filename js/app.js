@@ -6,7 +6,7 @@ import { Ink } from "./pointer.js";
 import { SRS } from "./srs.js";
 import { initAudio, isAudioAvailable, speakThai } from "./audio.js";
 
-const APP_VERSION = "v10"; // временный индикатор версии (виден в шапке) — для отладки прогрузки
+const APP_VERSION = "v11"; // временный индикатор версии (виден в шапке) — для отладки прогрузки
 const CLS = { mid: "средний", high: "высокий", low: "низкий" };
 const LEN = { short: "краткая", long: "долгая" };
 const POS = { before: "перед", after: "после", above: "сверху", below: "снизу", around: "вокруг" };
@@ -290,7 +290,7 @@ const App = {
     // Сопоставление со скелетом по порогу TOL (строго к расположению штрихов):
     //   precision — доля рукописи, лежащей НА осях буквы (наказывает лишние штрихи «не там», напр. петлю);
     //   recall    — доля осей буквы, ПРОЙДЕННЫХ рукописью (наказывает недостающие части).
-    const TOL = 0.06, TOL2 = TOL * TOL;
+    const TOL = 0.1, TOL2 = TOL * TOL;
     let onAxis = 0;
     for (const p of pts) {
       for (const s of sk) { const dx = p.x - s[0], dy = p.y - s[1]; if (dx * dx + dy * dy <= TOL2) { onAxis++; break; } }
@@ -306,7 +306,7 @@ const App = {
     const pct = Math.round(100 * precision * recall);
     // Временная отладочная разбивка: p = precision, r = recall, sk = число точек скелета.
     note.textContent = `Совпадение с буквой: ${pct}%  (p${Math.round(precision * 100)}·r${Math.round(recall * 100)}, sk${sk.length})`;
-    note.style.color = pct >= 70 ? "#6ad19a" : pct >= 45 ? "#e8c04a" : "#e87a7a";
+    note.style.color = pct >= 65 ? "#6ad19a" : pct >= 40 ? "#e8c04a" : "#e87a7a";
   },
 
   // ---------- SRS-сессия ----------
