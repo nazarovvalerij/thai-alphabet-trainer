@@ -278,28 +278,25 @@ const App = {
     const sk = glyphSkeleton(glyph);
     if (!sk.length) { note.textContent = "—"; note.style.color = "#e8c04a"; return; }
 
-    // Двусторонняя Chamfer-дистанция (среднее) между линией пользователя и скелетом буквы:
-    //   dPS — насколько ваши штрихи лежат на осях буквы (наказывает лишнее «не там»);
-    //   dSP — насколько вы прошли все оси буквы (наказывает недостающее).
-    let sumPS = 0;
+    // Сопоставление со скелетом по порогу TOL (строго к расположению штрихов):
+    //   precision — доля рукописи, лежащей НА осях буквы (наказывает лишние штрихи «не там», напр. петлю);
+    //   recall    — доля осей буквы, ПРОЙДЕННЫХ рукописью (наказывает недостающие части).
+    const TOL = 0.05, TOL2 = TOL * TOL;
+    let onAxis = 0;
     for (const p of pts) {
-      let m = Infinity;
-      for (const s of sk) { const dx = p.x - s[0], dy = p.y - s[1], d = dx * dx + dy * dy; if (d < m) m = d; }
-      sumPS += Math.sqrt(m);
+      for (const s of sk) { const dx = p.x - s[0], dy = p.y - s[1]; if (dx * dx + dy * dy <= TOL2) { onAxis++; break; } }
     }
-    let sumSP = 0;
+    const precision = onAxis / pts.length;
+    let covered = 0;
     for (const s of sk) {
-      let m = Infinity;
-      for (const p of pts) { const dx = p.x - s[0], dy = p.y - s[1], d = dx * dx + dy * dy; if (d < m) m = d; }
-      sumSP += Math.sqrt(m);
+      for (const p of pts) { const dx = p.x - s[0], dy = p.y - s[1]; if (dx * dx + dy * dy <= TOL2) { covered++; break; } }
     }
-    const D = (sumPS / pts.length + sumSP / sk.length) / 2;
+    const recall = covered / sk.length;
 
-    // Дистанция → проценты (D≈DMIN → 100%, D≥DMAX → 0%). Пороги можно подстроить.
-    const DMIN = 0.03, DMAX = 0.17;
-    const pct = Math.round(100 * Math.min(1, Math.max(0, (DMAX - D) / (DMAX - DMIN))));
+    // Итог — произведение (нужно И «без лишнего», И «без пропусков»). TOL/пороги можно подстроить.
+    const pct = Math.round(100 * precision * recall);
     note.textContent = `Совпадение с буквой: ${pct}%`;
-    note.style.color = pct >= 75 ? "#6ad19a" : pct >= 50 ? "#e8c04a" : "#e87a7a";
+    note.style.color = pct >= 70 ? "#6ad19a" : pct >= 45 ? "#e8c04a" : "#e87a7a";
   },
 
   // ---------- SRS-сессия ----------
