@@ -7,7 +7,7 @@ import { SRS } from "./srs.js";
 import { initAudio, isAudioAvailable, speakThai } from "./audio.js";
 import { t, getLang, setLang, glossOf } from "./i18n.js";
 
-const APP_VERSION = "v14"; // временный индикатор версии (виден в шапке) — для отладки прогрузки
+const APP_VERSION = "v15"; // временный индикатор версии (виден в шапке) — для отладки прогрузки
 const MODE_IDS = ["trace", "recall"];
 
 // Уникальный id карточки для SRS.
@@ -214,6 +214,7 @@ const App = {
       this._infoPrompt(info, item);
       this._btn(controls, t("ctl.undo"), () => this.board.ink.undo());
       this._btn(controls, t("ctl.clear"), () => this.board.ink.clear());
+      this._btn(controls, t("ctl.recognize"), () => this._recognize(info));
       this._btn(controls, t("ctl.showAnswer"), () => {
         this.revealed = true;
         this.board.drawTpl(glyph);
@@ -261,20 +262,10 @@ const App = {
     else this.showPractice(this.index, "recall"); // следующая попытка / новый показ
   },
 
-  _checkAccuracy(glyph, info, item) {
-    let note = info.querySelector(".accuracy");
-    if (!note) { note = document.createElement("div"); note.className = "accuracy"; info.appendChild(note); }
-
-    const raw = this.board.ink.allPoints();
-    if (raw.length < 5) {
-      note.textContent = t("check.writeFirst");
-      note.style.color = "#e8c04a";
-      return;
-    }
-
-    // Нормализуем рукопись по её рамке: можно писать в ЛЮБОМ месте поля и ЛЮБОГО размера.
-    // Центрируем и масштабируем так же, как эталонный глиф (бóльшая сторона → 0.78),
-    // сохраняя пропорции — сравниваем именно ФОРМУ, а не положение/масштаб.
+  // Нормализуем рукопись: рамку растягиваем в единичный квадрат [0..1]² (НЕ сохраняя пропорции),
+  // чтобы сравнение не зависело от места, размера и вытянутости. Возвращает точки или null.
+  _normUnit(raw) {
+    if (raw.length < 5) return null;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const p of raw) {
       if (p.x < minX) minX = p.x;
@@ -282,49 +273,77 @@ const App = {
       if (p.y < minY) minY = p.y;
       if (p.y > maxY) maxY = p.y;
     }
-    const w = maxX - minX, h = maxY - minY;
-    if (Math.max(w, h) < 0.02) {
-      note.textContent = t("check.writeLarger");
-      note.style.color = "#e8c04a";
-      return;
-    }
-    // Растягиваем рамку рукописи в единичный квадрат [0..1]² (НЕ сохраняя пропорции):
-    // совпадение не зависит ни от места, ни от размера, ни от вытянутости начертания.
-    const iw = Math.max(w, 1e-3), ih = Math.max(h, 1e-3);
-    const pts = raw.map((p) => ({ x: (p.x - minX) / iw, y: (p.y - minY) / ih }));
+    if (Math.max(maxX - minX, maxY - minY) < 0.02) return null;
+    const iw = Math.max(maxX - minX, 1e-3), ih = Math.max(maxY - minY, 1e-3);
+    return raw.map((p) => ({ x: (p.x - minX) / iw, y: (p.y - minY) / ih }));
+  },
 
-    // Сравниваем форму со СКЕЛЕТОМ (медиальной осью) буквы — это различает похожие буквы,
-    // т.к. сравнивается ход осевых линий, а не общая площадь силуэта.
+  // Скелет глифа, тоже растянутый в единичный квадрат (кешируется на глифе).
+  _skelUnit(glyph) {
+    if (glyph._skU) return glyph._skU;
     const sk0 = glyphSkeleton(glyph);
-    if (!sk0.length) { note.textContent = "—"; note.style.color = "#e8c04a"; return; }
-    // Скелет тоже растягиваем в единичный квадрат — сравниваем форму в одинаковой системе.
+    if (!sk0.length) { glyph._skU = []; return glyph._skU; }
     let kx0 = Infinity, ky0 = Infinity, kx1 = -Infinity, ky1 = -Infinity;
     for (const s of sk0) { if (s[0] < kx0) kx0 = s[0]; if (s[0] > kx1) kx1 = s[0]; if (s[1] < ky0) ky0 = s[1]; if (s[1] > ky1) ky1 = s[1]; }
     const kw = Math.max(kx1 - kx0, 1e-3), kh = Math.max(ky1 - ky0, 1e-3);
-    const sk = sk0.map((s) => [(s[0] - kx0) / kw, (s[1] - ky0) / kh]);
+    glyph._skU = sk0.map((s) => [(s[0] - kx0) / kw, (s[1] - ky0) / kh]);
+    return glyph._skU;
+  },
 
-    // Сопоставление со скелетом по порогу TOL (строго к расположению штрихов):
-    //   precision — доля рукописи, лежащей НА осях буквы (наказывает лишние штрихи «не там», напр. петлю);
-    //   recall    — доля осей буквы, ПРОЙДЕННЫХ рукописью (наказывает недостающие части).
-    const TOL = 0.1, TOL2 = TOL * TOL;
+  // Оценка совпадения нормализованной рукописи (pts) со скелетом (sk): precision²·recall.
+  _score(pts, sk) {
+    if (!sk.length) return { pct: 0, p: 0, r: 0 };
+    const TOL2 = 0.1 * 0.1;
     let onAxis = 0;
     for (const p of pts) {
       for (const s of sk) { const dx = p.x - s[0], dy = p.y - s[1]; if (dx * dx + dy * dy <= TOL2) { onAxis++; break; } }
     }
-    const precision = onAxis / pts.length;
+    const p = onAxis / pts.length;
     let covered = 0;
     for (const s of sk) {
-      for (const p of pts) { const dx = p.x - s[0], dy = p.y - s[1]; if (dx * dx + dy * dy <= TOL2) { covered++; break; } }
+      for (const q of pts) { const dx = q.x - s[0], dy = q.y - s[1]; if (dx * dx + dy * dy <= TOL2) { covered++; break; } }
     }
-    const recall = covered / sk.length;
+    const r = covered / sk.length;
+    return { pct: Math.round(100 * p * p * r), p, r };
+  },
 
-    // Итог = precision²·recall: precision в квадрате — строже наказываем «лишние» штрихи вне осей
-    // буквы (например, петлю), recall не даёт зачесть неполную форму. TOL/пороги можно подстроить.
-    const pct = Math.round(100 * precision * precision * recall);
-    // Временная отладочная разбивка: p = precision, r = recall, sk = число точек скелета.
-    note.textContent = `${t("check.match")}: ${pct}%  (p${Math.round(precision * 100)}·r${Math.round(recall * 100)}, sk${sk.length})`;
+  _note(info) {
+    let note = info.querySelector(".accuracy");
+    if (!note) { note = document.createElement("div"); note.className = "accuracy"; info.appendChild(note); }
+    return note;
+  },
+
+  _checkAccuracy(glyph, info, item) {
+    const note = this._note(info);
+    const pts = this._normUnit(this.board.ink.allPoints());
+    if (!pts) { note.textContent = t("check.writeFirst"); note.style.color = "#e8c04a"; return; }
+
+    const { pct, p, r } = this._score(pts, this._skelUnit(glyph));
+    // Временная отладочная разбивка p·r.
+    note.textContent = `${t("check.match")}: ${pct}%  (p${Math.round(p * 100)}·r${Math.round(r * 100)})`;
     note.style.color = pct >= 65 ? "#6ad19a" : pct >= 40 ? "#e8c04a" : "#e87a7a";
   },
+
+  // Распознавание: сравниваем рукопись со всеми буквами набора и берём лучшую.
+  _recognize(info) {
+    const note = this._note(info);
+    const pts = this._normUnit(this.board.ink.allPoints());
+    if (!pts) { note.textContent = t("check.writeFirst"); note.style.color = "#e8c04a"; return; }
+
+    let best = null, bestPct = -1;
+    for (const it of this.items()) {
+      const g = buildGlyph(glyphText(it));
+      const { pct } = this._score(pts, this._skelUnit(g));
+      if (pct > bestPct) { bestPct = pct; best = it; }
+    }
+    if (!best) return;
+    const gloss = glossOf(best);
+    const ch = best.char || best.display;
+    note.innerHTML = `${t("recognize.looksLike")}: <b class="rec-glyph">${ch}</b> · <span class="rtgs">${best.rtgs}</span>${gloss ? " — " + gloss : ""} <span class="rec-pct">(${bestPct}%)</span>`;
+    note.style.color = "var(--text)";
+    speakThai(ch);
+  },
+
 
   // ---------- SRS-сессия ----------
   startSrs() {
