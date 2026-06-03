@@ -6,6 +6,7 @@ import { Ink } from "./pointer.js";
 import { SRS } from "./srs.js";
 import { initAudio, isAudioAvailable, speakThai } from "./audio.js";
 
+const APP_VERSION = "v9"; // временный индикатор версии (виден в шапке) — для отладки прогрузки
 const CLS = { mid: "средний", high: "высокий", low: "низкий" };
 const LEN = { short: "краткая", long: "долгая" };
 const POS = { before: "перед", after: "после", above: "сверху", below: "снизу", around: "вокруг" };
@@ -70,6 +71,8 @@ const App = {
 
   async init() {
     initAudio();
+    const ver = document.getElementById("ver");
+    if (ver) ver.textContent = APP_VERSION;
     this.board = new Board();
     await loadFont();
     this._wireResize();
@@ -295,7 +298,8 @@ const App = {
 
     // Итог — произведение (нужно И «без лишнего», И «без пропусков»). TOL/пороги можно подстроить.
     const pct = Math.round(100 * precision * recall);
-    note.textContent = `Совпадение с буквой: ${pct}%`;
+    // Временная отладочная разбивка: p = precision, r = recall, sk = число точек скелета.
+    note.textContent = `Совпадение с буквой: ${pct}%  (p${Math.round(precision * 100)}·r${Math.round(recall * 100)}, sk${sk.length})`;
     note.style.color = pct >= 70 ? "#6ad19a" : pct >= 45 ? "#e8c04a" : "#e87a7a";
   },
 
