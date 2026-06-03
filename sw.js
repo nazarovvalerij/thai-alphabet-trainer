@@ -1,5 +1,5 @@
 // Service worker: офлайн-кеш ассетов (cache-first для статики приложения).
-const CACHE = "thai-trainer-v1";
+const CACHE = "thai-trainer-v2";
 const ASSETS = [
   "./",
   "./index.html",
@@ -7,7 +7,6 @@ const ASSETS = [
   "./js/app.js",
   "./js/template.js",
   "./js/pointer.js",
-  "./js/animate.js",
   "./js/srs.js",
   "./js/audio.js",
   "./js/data/consonants.js",

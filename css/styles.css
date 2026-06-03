@@ -74,7 +74,6 @@ body {
 .board { position: relative; background: var(--panel2); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; touch-action: none; }
 .layer { position: absolute; inset: 0; }
 .layer-tpl { z-index: 1; pointer-events: none; }
-.layer-anim { z-index: 2; pointer-events: none; }
 .layer-ink { z-index: 3; }
 
 .info { text-align: center; padding: 4px 12px; min-height: 64px; }

@@ -96,6 +96,23 @@ export function glyphPath2D(glyph, rect) {
   return p;
 }
 
+// Точки-семплы ВНУТРИ заливки глифа (нормализованное пространство [0..1]).
+// Используются для оценки обводки: точность (линия внутри буквы) и охват (вся буква пройдена).
+// Результат кешируется на самом объекте глифа.
+export function sampleInterior(glyph, step = 0.025) {
+  if (glyph._interior) return glyph._interior;
+  const ctx = document.createElement("canvas").getContext("2d");
+  const path = glyphPath2D(glyph, { x: 0, y: 0, size: 1 });
+  const pts = [];
+  for (let y = step / 2; y < 1; y += step) {
+    for (let x = step / 2; x < 1; x += step) {
+      if (ctx.isPointInPath(path, x, y, "nonzero")) pts.push([x, y]);
+    }
+  }
+  glyph._interior = pts;
+  return pts;
+}
+
 // Бледный шаблон глифа (заливка + тонкий контур) для режима обводки.
 export function drawTemplate(ctx, glyph, rect) {
   const p = glyphPath2D(glyph, rect);

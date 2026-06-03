@@ -1,9 +1,8 @@
 // Главный контроллер: состояние, экраны и склейка модулей.
 import { CONSONANTS } from "./data/consonants.js";
 import { VOWELS } from "./data/vowels.js";
-import { loadFont, buildGlyph, drawTemplate } from "./template.js";
+import { loadFont, buildGlyph, drawTemplate, sampleInterior } from "./template.js";
 import { Ink } from "./pointer.js";
-import { Animator } from "./animate.js";
 import { SRS } from "./srs.js";
 import { initAudio, isAudioAvailable, speakThai } from "./audio.js";
 
@@ -12,7 +11,6 @@ const LEN = { short: "краткая", long: "долгая" };
 const POS = { before: "перед", after: "после", above: "сверху", below: "снизу", around: "вокруг" };
 const MODES = [
   { id: "trace", label: "Обводка" },
-  { id: "animate", label: "Анимация" },
   { id: "recall", label: "Память" },
 ];
 
@@ -27,11 +25,9 @@ class Board {
     this.el = document.createElement("div");
     this.el.className = "board";
     this.tpl = this._canvas("tpl");
-    this.anim = this._canvas("anim");
     this.inkCanvas = this._canvas("ink");
     this.size = 300;
     this.ink = new Ink(this.inkCanvas, () => this.getRect());
-    this.animator = new Animator(this.anim, () => this.getRect());
   }
   _canvas(name) {
     const c = document.createElement("canvas");
@@ -45,7 +41,7 @@ class Board {
     this.size = s;
     const dpr = window.devicePixelRatio || 1;
     this.el.style.width = this.el.style.height = s + "px";
-    for (const c of [this.tpl, this.anim, this.inkCanvas]) {
+    for (const c of [this.tpl, this.inkCanvas]) {
       c.style.width = c.style.height = s + "px";
       c.width = c.height = Math.floor(s * dpr);
       const ctx = c.getContext("2d");
@@ -179,23 +175,16 @@ const App = {
     const glyph = buildGlyph(glyphText(item));
     const info = document.querySelector(".info");
     const controls = document.querySelector(".controls");
-    this.board.animator.clear();
     this.board.ink.clear();
     controls.innerHTML = "";
-    this.board.setInkEnabled(this.mode !== "animate");
+    this.board.setInkEnabled(true);
 
     if (this.mode === "trace") {
       this.board.drawTpl(glyph);
       this._infoFull(info, item);
       this._btn(controls, "Отменить", () => this.board.ink.undo());
       this._btn(controls, "Очистить", () => this.board.ink.clear());
-      this._btn(controls, "Показать порядок", () => this.board.animator.play(glyph, item.strokes));
       this._btn(controls, "Проверить", () => this._checkAccuracy(glyph, info, item));
-    } else if (this.mode === "animate") {
-      this.board.drawTpl(glyph);
-      this._infoFull(info, item);
-      this._btn(controls, "▶ Повторить", () => this.board.animator.play(glyph, item.strokes));
-      this.board.animator.play(glyph, item.strokes);
     } else if (this.mode === "recall") {
       this.board.clearTemplate();
       this._infoPrompt(info, item);
@@ -205,7 +194,6 @@ const App = {
         this.revealed = true;
         this.board.drawTpl(glyph);
         this._infoFull(info, item);
-        this.board.animator.play(glyph, item.strokes);
         this._renderGrades(controls, item);
       });
     }
@@ -249,25 +237,46 @@ const App = {
   },
 
   _checkAccuracy(glyph, info, item) {
-    const pts = this.board.ink.allPoints();
-    if (!pts.length) return;
-    let covered = 0, total = 0;
-    for (const c of glyph.contours) {
-      for (let i = 0; i < c.length; i += 2) {
-        total++;
-        const [gx, gy] = c[i];
-        let near = false;
-        for (const p of pts) {
-          if (Math.hypot(p.x - gx, p.y - gy) < 0.05) { near = true; break; }
-        }
-        if (near) covered++;
-      }
-    }
-    const pct = total ? Math.round((covered / total) * 100) : 0;
     let note = info.querySelector(".accuracy");
     if (!note) { note = document.createElement("div"); note.className = "accuracy"; info.appendChild(note); }
-    note.textContent = `Покрытие контура: ${pct}%`;
-    note.style.color = pct >= 75 ? "#6ad19a" : pct >= 50 ? "#e8c04a" : "#e87a7a";
+
+    const pts = this.board.ink.allPoints();
+    if (!pts.length) {
+      note.textContent = "Сначала напишите букву";
+      note.style.color = "#e8c04a";
+      return;
+    }
+
+    // Семплы внутри формы буквы (в нормализованных координатах [0..1]).
+    const interior = sampleInterior(glyph);
+    const BAND = 0.04;  // допуск «линия на букве» (точность)
+    const REACH = 0.1;  // радиус, в котором осевая линия «покрывает» площадь (охват)
+
+    // Точность: доля точек рукописи, попавших внутрь буквы (с допуском на дрожь руки).
+    let onLetter = 0;
+    for (const p of pts) {
+      let best = Infinity;
+      for (const s of interior) {
+        const d = Math.hypot(p.x - s[0], p.y - s[1]);
+        if (d < best) { best = d; if (best <= BAND) break; }
+      }
+      if (best <= BAND) onLetter++;
+    }
+    const precision = onLetter / pts.length;
+
+    // Охват: доля площади буквы, рядом с которой прошла линия (наказывает «недописанное»).
+    let reached = 0;
+    for (const s of interior) {
+      for (const p of pts) {
+        if (Math.hypot(p.x - s[0], p.y - s[1]) <= REACH) { reached++; break; }
+      }
+    }
+    const coverage = interior.length ? reached / interior.length : 0;
+
+    // Итог — среднее геометрическое: штрафует и «грязь» снаружи, и неполную обводку.
+    const pct = Math.round(100 * Math.sqrt(precision * coverage));
+    note.textContent = `Точность обводки: ${pct}%`;
+    note.style.color = pct >= 80 ? "#6ad19a" : pct >= 55 ? "#e8c04a" : "#e87a7a";
   },
 
   // ---------- SRS-сессия ----------
