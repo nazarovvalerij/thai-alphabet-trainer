@@ -240,19 +240,39 @@ const App = {
     let note = info.querySelector(".accuracy");
     if (!note) { note = document.createElement("div"); note.className = "accuracy"; info.appendChild(note); }
 
-    const pts = this.board.ink.allPoints();
-    if (!pts.length) {
+    const raw = this.board.ink.allPoints();
+    if (raw.length < 5) {
       note.textContent = "Сначала напишите букву";
       note.style.color = "#e8c04a";
       return;
     }
 
+    // Нормализуем рукопись по её рамке: можно писать в ЛЮБОМ месте поля и ЛЮБОГО размера.
+    // Центрируем и масштабируем так же, как эталонный глиф (бóльшая сторона → 0.78),
+    // сохраняя пропорции — сравниваем именно ФОРМУ, а не положение/масштаб.
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const p of raw) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    const w = maxX - minX, h = maxY - minY;
+    if (Math.max(w, h) < 0.02) {
+      note.textContent = "Напишите букву покрупнее";
+      note.style.color = "#e8c04a";
+      return;
+    }
+    const scale = 0.78 / Math.max(w, h);
+    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+    const pts = raw.map((p) => ({ x: 0.5 + (p.x - cx) * scale, y: 0.5 + (p.y - cy) * scale }));
+
     // Семплы внутри формы буквы (в нормализованных координатах [0..1]).
     const interior = sampleInterior(glyph);
-    const BAND = 0.04;  // допуск «линия на букве» (точность)
+    const BAND = 0.05;  // допуск «линия на букве» (точность)
     const REACH = 0.1;  // радиус, в котором осевая линия «покрывает» площадь (охват)
 
-    // Точность: доля точек рукописи, попавших внутрь буквы (с допуском на дрожь руки).
+    // Точность: доля точек рукописи, попавших внутрь формы буквы (с допуском на дрожь руки).
     let onLetter = 0;
     for (const p of pts) {
       let best = Infinity;
@@ -264,7 +284,7 @@ const App = {
     }
     const precision = onLetter / pts.length;
 
-    // Охват: доля площади буквы, рядом с которой прошла линия (наказывает «недописанное»).
+    // Охват: доля площади буквы, рядом с которой прошла линия (наказывает недописанное).
     let reached = 0;
     for (const s of interior) {
       for (const p of pts) {
@@ -273,9 +293,9 @@ const App = {
     }
     const coverage = interior.length ? reached / interior.length : 0;
 
-    // Итог — среднее геометрическое: штрафует и «грязь» снаружи, и неполную обводку.
+    // Итог — среднее геометрическое: штрафует и «грязь» снаружи, и неполную форму.
     const pct = Math.round(100 * Math.sqrt(precision * coverage));
-    note.textContent = `Точность обводки: ${pct}%`;
+    note.textContent = `Совпадение с буквой: ${pct}%`;
     note.style.color = pct >= 80 ? "#6ad19a" : pct >= 55 ? "#e8c04a" : "#e87a7a";
   },
 
