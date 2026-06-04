@@ -6,8 +6,9 @@ import { Ink } from "./pointer.js";
 import { SRS } from "./srs.js";
 import { initAudio, isAudioAvailable, speakThai } from "./audio.js";
 import { t, getLang, setLang, glossOf } from "./i18n.js";
+import { recognizeInk } from "./hwr.js";
 
-const APP_VERSION = "v17"; // временный индикатор версии (виден в шапке) — для отладки прогрузки
+const APP_VERSION = "v18"; // временный индикатор версии (виден в шапке) — для отладки прогрузки
 const MODE_IDS = ["trace", "recall"];
 
 // Уникальный id карточки для SRS.
@@ -324,12 +325,33 @@ const App = {
     note.style.color = pct >= 65 ? "#6ad19a" : pct >= 40 ? "#e8c04a" : "#e87a7a";
   },
 
-  // Распознавание: сравниваем рукопись со всеми буквами набора и берём лучшую.
-  _recognize(info) {
+  // Распознавание написанного: сначала ОНЛАЙН (Google, слова с гласными), при неудаче — ОФЛАЙН одна буква.
+  async _recognize(info) {
     const note = this._note(info);
+    const ink = this.board.ink.inkData(this.board.size);
+    if (!ink.length || ink.every((s) => s[0].length < 2)) {
+      note.textContent = t("check.writeFirst"); note.style.color = "#e8c04a"; return;
+    }
+    note.textContent = t("hwr.recognizing"); note.style.color = "var(--muted)";
+    let cands = [];
+    try {
+      cands = await recognizeInk(ink, this.board.size, this.board.size);
+    } catch (_) { cands = null; } // нет сети / таймаут / CORS
+    if (cands && cands.length) {
+      const top = cands[0];
+      const alt = cands.slice(1, 4).join("  ");
+      note.innerHTML = `${t("recognize.looksLike")}: <b class="rec-glyph">${top}</b>${alt ? ` <span class="rec-pct">${alt}</span>` : ""}`;
+      note.style.color = "var(--text)";
+      speakThai(top);
+      return;
+    }
+    // Фолбэк: офлайн-классификация ОДНОЙ буквы по текущему набору.
+    this._recognizeLocal(info, note, cands === null);
+  },
+
+  _recognizeLocal(info, note, offline) {
     const pts = this._normUnit(this.board.ink.allPoints());
     if (!pts) { note.textContent = t("check.writeFirst"); note.style.color = "#e8c04a"; return; }
-
     let best = null, bestPct = -1;
     for (const it of this.items()) {
       const g = buildGlyph(glyphText(it));
@@ -339,7 +361,8 @@ const App = {
     if (!best) return;
     const gloss = glossOf(best);
     const ch = best.char || best.display;
-    note.innerHTML = `${t("recognize.looksLike")}: <b class="rec-glyph">${ch}</b> · <span class="rtgs">${best.rtgs}</span>${gloss ? " — " + gloss : ""} <span class="rec-pct">(${bestPct}%)</span>`;
+    const prefix = offline ? t("hwr.offlineLetter") : t("recognize.looksLike");
+    note.innerHTML = `${prefix}: <b class="rec-glyph">${ch}</b> · <span class="rtgs">${best.rtgs}</span>${gloss ? " — " + gloss : ""} <span class="rec-pct">(${bestPct}%)</span>`;
     note.style.color = "var(--text)";
     speakThai(ch);
   },

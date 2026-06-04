@@ -31,6 +31,7 @@ export class Ink {
       x: (e.clientX - b.left - r.x) / r.size,
       y: (e.clientY - b.top - r.y) / r.size,
       p: e.pressure && e.pressure > 0 ? e.pressure : 0.5,
+      t: (typeof performance !== "undefined" ? performance.now() : Date.now()),
     };
   }
 
@@ -86,6 +87,23 @@ export class Ink {
     const pts = [];
     for (const s of this.strokes) for (const p of s.points) pts.push(p);
     return pts;
+  }
+
+  // Штрихи в формате Google Input Tools: массив [[x..],[y..],[t..]] в пикселях поля `size`.
+  inkData(size) {
+    const t0 = this.strokes[0] && this.strokes[0].points[0] ? this.strokes[0].points[0].t : 0;
+    const ink = [];
+    for (const s of this.strokes) {
+      if (!s.points.length) continue;
+      const xs = [], ys = [], ts = [];
+      for (const p of s.points) {
+        xs.push(Math.round(p.x * size));
+        ys.push(Math.round(p.y * size));
+        ts.push(Math.round((p.t != null ? p.t : t0) - t0));
+      }
+      ink.push([xs, ys, ts]);
+    }
+    return ink;
   }
 
   redraw() {
