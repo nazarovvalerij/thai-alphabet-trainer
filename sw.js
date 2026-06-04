@@ -1,6 +1,6 @@
 // Service worker: network-first — при наличии сети всегда берём свежую версию и обновляем кеш,
 // офлайн — отдаём из кеша. (Раньше был cache-first, из-за чего обновления не подхватывались.)
-const CACHE = "thai-trainer-v18";
+const CACHE = "thai-trainer-v19";
 const ASSETS = [
   "./",
   "./index.html",
@@ -8,6 +8,7 @@ const ASSETS = [
   "./js/app.js",
   "./js/i18n.js",
   "./js/hwr.js",
+  "./js/translate.js",
   "./js/template.js",
   "./js/pointer.js",
   "./js/srs.js",

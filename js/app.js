@@ -7,8 +7,9 @@ import { SRS } from "./srs.js";
 import { initAudio, isAudioAvailable, speakThai } from "./audio.js";
 import { t, getLang, setLang, glossOf } from "./i18n.js";
 import { recognizeInk } from "./hwr.js";
+import { translateThai } from "./translate.js";
 
-const APP_VERSION = "v18"; // временный индикатор версии (виден в шапке) — для отладки прогрузки
+const APP_VERSION = "v19"; // временный индикатор версии (виден в шапке) — для отладки прогрузки
 const MODE_IDS = ["trace", "recall"];
 
 // Уникальный id карточки для SRS.
@@ -340,13 +341,35 @@ const App = {
     if (cands && cands.length) {
       const top = cands[0];
       const alt = cands.slice(1, 4).join("  ");
-      note.innerHTML = `${t("recognize.looksLike")}: <b class="rec-glyph">${top}</b>${alt ? ` <span class="rec-pct">${alt}</span>` : ""}`;
+      note.innerHTML = `${t("recognize.looksLike")}: <b class="rec-glyph">${top}</b>${alt ? ` <span class="rec-pct">${alt}</span>` : ""}<div class="rec-extra"></div>`;
       note.style.color = "var(--text)";
       speakThai(top);
+      this._showTranslation(note, top); // транслитерация + перевод (онлайн, асинхронно)
       return;
     }
     // Фолбэк: офлайн-классификация ОДНОЙ буквы по текущему набору.
     this._recognizeLocal(info, note, cands === null);
+  },
+
+  // Дописывает под распознанным словом транслитерацию (латиницей) и перевод на язык интерфейса.
+  // Внешний текст вставляем через textContent (без innerHTML). Ошибки/офлайн — молча.
+  async _showTranslation(note, text) {
+    const box = note.querySelector(".rec-extra");
+    if (!box) return;
+    let res;
+    try { res = await translateThai(text, getLang()); }
+    catch (_) { return; }
+    if (!res || (!res.romanization && !res.translation)) return;
+    box.textContent = "";
+    if (res.romanization) {
+      const r = document.createElement("span");
+      r.className = "rtgs";
+      r.textContent = res.romanization;
+      box.appendChild(r);
+    }
+    if (res.translation) {
+      box.appendChild(document.createTextNode((res.romanization ? " — " : "") + res.translation));
+    }
   },
 
   _recognizeLocal(info, note, offline) {

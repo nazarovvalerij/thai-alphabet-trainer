@@ -97,6 +97,8 @@ body {
 .accuracy { margin-top: 6px; font-weight: 600; }
 .accuracy .rec-glyph { font-family: "ThaiUI", system-ui, sans-serif; font-size: 22px; }
 .accuracy .rec-pct { color: var(--muted); font-weight: 400; }
+.accuracy .rec-extra { margin-top: 2px; font-weight: 400; color: var(--text); }
+.accuracy .rec-extra .rtgs { color: var(--accent); font-weight: 600; }
 
 .controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 4px 12px; }
 .ctl { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; font-size: 14px; cursor: pointer; }
