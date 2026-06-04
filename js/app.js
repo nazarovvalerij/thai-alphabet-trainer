@@ -9,7 +9,7 @@ import { t, getLang, setLang, glossOf } from "./i18n.js";
 import { recognizeInk } from "./hwr.js";
 import { translateThai } from "./translate.js";
 
-const APP_VERSION = "v19"; // временный индикатор версии (виден в шапке) — для отладки прогрузки
+const APP_VERSION = "v20"; // временный индикатор версии (виден в шапке) — для отладки прогрузки
 const MODE_IDS = ["trace", "recall"];
 
 // Уникальный id карточки для SRS.
@@ -344,11 +344,37 @@ const App = {
       note.innerHTML = `${t("recognize.looksLike")}: <b class="rec-glyph">${top}</b>${alt ? ` <span class="rec-pct">${alt}</span>` : ""}<div class="rec-extra"></div>`;
       note.style.color = "var(--text)";
       speakThai(top);
-      this._showTranslation(note, top); // транслитерация + перевод (онлайн, асинхронно)
+      // Одиночную известную букву подписываем своими данными; слова/фразы — через онлайн-перевод.
+      const known = this._knownChar(top);
+      if (known) this._fillLetterInfo(note, known);
+      else this._showTranslation(note, top);
       return;
     }
     // Фолбэк: офлайн-классификация ОДНОЙ буквы по текущему набору.
     this._recognizeLocal(info, note, cands === null);
+  },
+
+  // Ищет распознанный одиночный символ в наборах (согласные/гласные). Возвращает item или null.
+  _knownChar(s) {
+    if (Array.from(s).length !== 1) return null;
+    for (const c of CONSONANTS) if (c.char === s) return c;
+    for (const v of VOWELS) if (v.mark === s || v.display === s) return v;
+    return null;
+  },
+
+  // Подпись для известной буквы: rtgs + значение из наших данных (без обращения к сети).
+  _fillLetterInfo(note, item) {
+    const box = note.querySelector(".rec-extra");
+    if (!box) return;
+    const gloss = glossOf(item);
+    box.textContent = "";
+    if (item.rtgs) {
+      const r = document.createElement("span");
+      r.className = "rtgs";
+      r.textContent = item.rtgs;
+      box.appendChild(r);
+    }
+    if (gloss) box.appendChild(document.createTextNode((item.rtgs ? " — " : "") + gloss));
   },
 
   // Дописывает под распознанным словом транслитерацию (латиницей) и перевод на язык интерфейса.
